@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RECEIPTS - Cash & Khata Ledger</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #0b0f19;
+            color: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-receipt, #printable-receipt * {
+                visibility: visible;
+            }
+            #printable-receipt {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                color: #000 !important;
+                background: #fff !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-950 text-slate-100">
+
+    <!-- Splash Screen Sequence -->
+    <div id="splash-screen" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center transition-opacity duration-500">
+        <div id="splash-stage-1" class="flex flex-col items-center justify-center space-y-4">
+            <div class="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <i class="fa-solid fa-receipt text-3xl text-white"></i>
+            </div>
+            <div class="text-center">
+                <h1 class="text-2xl font-bold tracking-tight text-white">RECEIPTS</h1>
+                <p class="text-xs text-slate-400 font-medium tracking-widest mt-1">BY AKS SOFTWARE</p>
+            </div>
+        </div>
+        <div id="splash-stage-2" class="hidden flex-col items-center justify-center space-y-3 w-64">
+            <div class="text-xs text-slate-400 font-mono tracking-wider">INITIALIZING LEDGER SYSTEM...</div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div id="splash-progress" class="bg-blue-500 h-full w-0 transition-all duration-300 ease-out"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Navigation Bar -->
+    <header class="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur flex items-center justify-between px-6 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+                <i class="fa-solid fa-receipt text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-slate-100 tracking-tight leading-none text-base">RECEIPTS</h1>
+                <span class="text-[10px] text-slate-400 font-semibold tracking-wider">BY AKS SOFTWARE</span>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <button onclick="openSettingsModal()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Lender Settings">
+                <i class="fa-solid fa-gear text-lg"></i>
+            </button>
+            <button onclick="openAddBorrowerModal()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-4 py-2 rounded-lg transition flex items-center space-x-2 shadow-sm">
+                <i class="fa-solid fa-plus"></i>
+                <span>Add Customer</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- App Dashboard Layout -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Main Content Area -->
+        <section class="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-6 space-y-6">
+            
+            <!-- Summary Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Outstanding</span>
+                        <div id="stat-total-out" class="text-2xl font-bold text-rose-400 mt-1">₹0</div>
+                    </div>
+                    <div class="w-10 h-10 bg-rose-500/10 rounded-lg flex items-center justify-center text-rose-400">
+                        <i class="fa-solid fa-hand-holding-dollar text-xl"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium uppercase tracking-wider">Active Customers</span>
+                        <div id="stat-active-count" class="text-2xl font-bold text-slate-100 mt-1">0</div>
+                    </div>
+                    <div class="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-400">
+                        <i class="fa-solid fa-users text-xl"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Collected</span>
+                        <div id="stat-total-collected" class="text-2xl font-bold text-emerald-400 mt-1">₹0</div>
+                    </div>
+                    <div class="w-10 h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-400">
+                        <i class="fa-solid fa-circle-check text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Ledger Section -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl flex flex-col flex-1 overflow-hidden">
+                <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="relative w-full sm:w-72">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                        <input type="text" id="search-input" onkeyup="renderLedger()" placeholder="Search by name or phone..." class="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 pl-9 pr-3 py-2 rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                        <select id="filter-status" onchange="renderLedger()" class="bg-slate-950 border border-slate-800 text-xs text-slate-300 py-2 px-3 rounded-lg focus:outline-none">
+                            <option value="ALL">All Statuses</option>
+                            <option value="OVERDUE">Overdue Only</option>
+                            <option value="DUE_TODAY">Due Today</option>
+                            <option value="PARTIAL">Partial Paid</option>
+                            <option value="UNPAID">Unpaid</option>
+                            <option value="SETTLED">Settled</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Ledger Table -->
+                <div class="flex-1 overflow-y-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-800 bg-slate-950/50 text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+                                <th class="p-4">Customer</th>
+                                <th class="p-4">Due Date</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-right">Balance</th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledger-body" class="divide-y divide-slate-800/60 text-xs">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                    <div id="empty-state" class="hidden p-12 text-center text-slate-500">
+                        <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-600"></i>
+                        <p class="text-sm font-medium">No customer records found</p>
+                        <p class="text-xs mt-1">Click "Add Customer" to create your first ledger entry.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Add / Edit Customer -->
+    <div id="modal-customer" class="hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-bold text-slate-100 uppercase tracking-wider" id="modal-customer-title">Add New Customer</h3>
+                <button onclick="closeCustomerModal()" class="text-slate-500 hover:text-slate-300"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="form-customer" onsubmit="saveCustomer(event)" class="space-y-4">
+                <input type="hidden" id="cust-id">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Full Name</label>
+                    <input type="text" id="cust-name" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-blue-500 focus:outline-none" placeholder="e.g. Ramesh Kumar">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">WhatsApp / Phone Number</label>
+                    <input type="tel" id="cust-phone" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-blue-500 focus:outline-none" placeholder="e.g. 9876543210">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Initial Amount Given (₹)</label>
+                    <input type="number" id="cust-amount" required min="0" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-blue-500 focus:outline-none" placeholder="e.g. 5000">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Payment Due Date</label>
+                    <input type="date" id="cust-due" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-blue-500 focus:outline-none">
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeCustomerModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-4 py-2 rounded-lg transition">Save Ledger Entry</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Record Payment -->
+    <div id="modal-payment" class="hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-sm p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-bold text-slate-100 uppercase tracking-wider">Record Repayment</h3>
+                <button onclick="closePaymentModal()" class="text-slate-500 hover:text-slate-300"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="form-payment" onsubmit="savePayment(event)" class="space-y-4">
+                <input type="hidden" id="pay-cust-id">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Customer Name</label>
+                    <input type="text" id="pay-cust-name" disabled class="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Repayment Amount (₹)</label>
+                    <input type="number" id="pay-amount" required min="1" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-blue-500 focus:outline-none" placeholder="e.g. 1000">
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closePaymentModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-4 py-2 rounded-lg transition">Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Settings (UPI Details) -->
+    <div id="modal-settings" class="hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-bold text-slate-100 uppercase tracking-wider">Lender UPI Payment Settings</h3>
+                <button onclick="closeSettingsModal()" class="text-slate-500 hover:text-slate-300"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="form-settings" onsubmit="saveSettings(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Your Business / Payee Name</label>
+                    <input type="text" id="set-payee-name" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-blue-500 focus:outline-none" placeholder="e.g. Sharvesh AK">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Your UPI ID (VPA)</label>
+                    <input type="text" id="set-upi-id" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:border-blue-500 focus:outline-none" placeholder="e.g. merchant@upi or 9876543210@ybl">
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white">Cancel</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-4 py-2 rounded-lg transition">Save Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Printable Receipt Preview Modal -->
+    <div id="modal-receipt" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl max-h-[90vh]">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Printable Statement Preview</h3>
+                <button onclick="closeReceiptModal()" class="text-slate-500 hover:text-slate-300"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6 bg-slate-950 custom-scrollbar">
+                <!-- Printable Container -->
+                <div id="printable-receipt" class="bg-white text-slate-900 p-6 rounded shadow-sm text-xs space-y-4 font-mono">
+                    <div class="text-center border-b border-slate-300 pb-4">
+                        <h2 class="text-base font-bold tracking-tight text-slate-900">RECEIPTS</h2>
+                        <p class="text-[10px] text-slate-600">MANAGED BY AKS SOFTWARE</p>
+                        <p id="rcpt-date" class="text-[10px] text-slate-500 mt-1"></p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 text-[11px] border-b border-slate-200 pb-3">
+                        <div>
+                            <span class="text-slate-500 block">CUSTOMER:</span>
+                            <strong id="rcpt-cust-name" class="text-slate-900"></strong>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-slate-500 block">PHONE:</span>
+                            <span id="rcpt-cust-phone" class="text-slate-800"></span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="font-bold border-b border-slate-300 pb-1 mb-2 text-slate-800">SUMMARY</div>
+                        <div class="flex justify-between py-1">
+                            <span>Total Loan Amount:</span>
+                            <span id="rcpt-total-loan" class="font-bold"></span>
+                        </div>
+                        <div class="flex justify-between py-1">
+                            <span>Total Repaid:</span>
+                            <span id="rcpt-total-repaid" class="text-emerald-700 font-bold"></span>
+                        </div>
+                        <div class="flex justify-between py-1 text-sm border-t border-slate-300 pt-2 font-bold">
+                            <span>Current Balance Due:</span>
+                            <span id="rcpt-balance-due" class="text-rose-700"></span>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4 text-center text-[10px] text-slate-500">
+                        <p>Thank you for keeping accounts clear.</p>
+                        <p class="mt-0.5">Computer-generated statement from RECEIPTS App.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-800 bg-slate-900 flex justify-end space-x-3">
+                <button onclick="closeReceiptModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white">Close</button>
+                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-4 py-2 rounded-lg transition flex items-center space-x-2">
+                    <i class="fa-solid fa-print"></i>
+                    <span>Print / Save PDF</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // Force-clear any previous dummy storage keys
+        if (localStorage.getItem('borrowers_data') && localStorage.getItem('borrowers_data').includes("Amad Smith")) {
+            localStorage.removeItem('borrowers_data');
+        }
+
+        // State Management
+        let borrowers = JSON.parse(localStorage.getItem('borrowers_data')) || [];
+        let settings = JSON.parse(localStorage.getItem('receipts_settings')) || {
+            payeeName: "RECEIPTS LEDGER",
+            upiId: "merchant@upi"
+        };
+
+        // Application Startup / Splash Screen
+        window.addEventListener('DOMContentLoaded', () => {
+            const splash = document.getElementById('splash-screen');
+            const stage1 = document.getElementById('splash-stage-1');
+            const stage2 = document.getElementById('splash-stage-2');
+            const progressBar = document.getElementById('splash-progress');
+
+            setTimeout(() => {
+                stage1.classList.add('hidden');
+                stage2.classList.remove('hidden');
+                stage2.classList.add('flex');
+                
+                setTimeout(() => { progressBar.style.width = '100%'; }, 50);
+
+                setTimeout(() => {
+                    splash.classList.add('opacity-0');
+                    setTimeout(() => splash.remove(), 500);
+                }, 800);
+            }, 700);
+
+            renderLedger();
+        });
+
+        function saveData() {
+            localStorage.setItem('borrowers_data', JSON.stringify(borrowers));
+            renderLedger();
+        }
+
+        function getStatusInfo(borrower) {
+            const balance = borrower.amountGiven - borrower.amountPaid;
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            if (balance <= 0) {
+                return { label: 'SETTLED (₹0)', class: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', code: 'SETTLED' };
+            }
+            if (borrower.dueDate < todayStr) {
+                const diffDays = Math.ceil((new Date(todayStr) - new Date(borrower.dueDate)) / (1000 * 60 * 60 * 24));
+                return { label: `OVERDUE (${diffDays}d)`, class: 'bg-rose-500/10 text-rose-400 border-rose-500/20', code: 'OVERDUE' };
+            }
+            if (borrower.dueDate === todayStr) {
+                return { label: 'DUE TODAY', class: 'bg-amber-500/10 text-amber-400 border-amber-500/20', code: 'DUE_TODAY' };
+            }
+            if (borrower.amountPaid > 0) {
+                return { label: `PARTIAL PAID`, class: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', code: 'PARTIAL' };
+            }
+            return { label: 'UNPAID', class: 'bg-slate-800 text-slate-400 border-slate-700', code: 'UNPAID' };
+        }
+
+        function renderLedger() {
+            const tbody = document.getElementById('ledger-body');
+            const emptyState = document.getElementById('empty-state');
+            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            const filterVal = document.getElementById('filter-status').value;
+
+            tbody.innerHTML = '';
+
+            let totalOut = 0;
+            let totalColl = 0;
+            let activeCount = 0;
+
+            const filtered = borrowers.filter(b => {
+                const balance = b.amountGiven - b.amountPaid;
+                totalColl += b.amountPaid;
+                if (balance > 0) {
+                    totalOut += balance;
+                    activeCount++;
+                }
+
+                const matchesSearch = b.name.toLowerCase().includes(searchVal) || b.phone.includes(searchVal);
+                const status = getStatusInfo(b);
+                const matchesFilter = filterVal === 'ALL' || status.code === filterVal;
+
+                return matchesSearch && matchesFilter;
+            });
+
+            document.getElementById('stat-total-out').innerText = `₹${totalOut.toLocaleString('en-IN')}`;
+            document.getElementById('stat-total-collected').innerText = `₹${totalColl.toLocaleString('en-IN')}`;
+            document.getElementById('stat-active-count').innerText = activeCount;
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filtered.forEach(b => {
+                const balance = b.amountGiven - b.amountPaid;
+                const status = getStatusInfo(b);
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-900/60 transition border-b border-slate-800/40';
+                tr.innerHTML = `
+                    <td class="p-4">
+                        <div class="font-medium text-slate-100 text-sm">${escapeHtml(b.name)}</div>
+                        <div class="text-[11px] text-slate-500 mt-0.5"><i class="fa-brands fa-whatsapp text-emerald-500/80 mr-1"></i>${escapeHtml(b.phone)}</div>
+                    </td>
+                    <td class="p-4 text-slate-400">${b.dueDate}</td>
+                    <td class="p-4">
+                        <span class="px-2.5 py-1 text-[10px] font-semibold rounded-full border ${status.class}">
+                            ${status.label}
+                        </span>
+                    </td>
+                    <td class="p-4 text-right font-semibold ${balance > 0 ? 'text-rose-400' : 'text-emerald-400'}">
+                        ₹${balance.toLocaleString('en-IN')}
+                    </td>
+                    <td class="p-4 text-right space-x-1">
+                        ${balance > 0 ? `
+                            <button onclick="openPaymentModal('${b.id}')" class="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition" title="Record Payment">
+                                <i class="fa-solid fa-indian-rupee-sign"></i>
+                            </button>
+                        ` : ''}
+                        <button onclick="sendWhatsAppReminder('${b.id}')" class="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition" title="Send WhatsApp Reminder">
+                            <i class="fa-brands fa-whatsapp text-base"></i>
+                        </button>
+                        <button onclick="openReceiptModal('${b.id}')" class="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition" title="Print Receipt">
+                            <i class="fa-solid fa-file-invoice"></i>
+                        </button>
+                        <button onclick="deleteCustomer('${b.id}')" class="p-2 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition" title="Delete Entry">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Modal Controllers
+        function openAddBorrowerModal() {
+            document.getElementById('form-customer').reset();
+            document.getElementById('cust-id').value = '';
+            document.getElementById('modal-customer-title').innerText = "Add New Customer";
+            document.getElementById('cust-due').value = new Date().toISOString().split('T')[0];
+            document.getElementById('modal-customer').classList.remove('hidden');
+        }
+
+        function closeCustomerModal() {
+            document.getElementById('modal-customer').classList.add('hidden');
+        }
+
+        function saveCustomer(e) {
+            e.preventDefault();
+            const id = document.getElementById('cust-id').value || Date.now().toString();
+            const name = document.getElementById('cust-name').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const amount = parseFloat(document.getElementById('cust-amount').value);
+            const dueDate = document.getElementById('cust-due').value;
+
+            const existingIdx = borrowers.findIndex(b => b.id === id);
+            if (existingIdx >= 0) {
+                borrowers[existingIdx].name = name;
+                borrowers[existingIdx].phone = phone;
+                borrowers[existingIdx].amountGiven = amount;
+                borrowers[existingIdx].dueDate = dueDate;
+            } else {
+                borrowers.push({ id, name, phone, amountGiven: amount, amountPaid: 0, dueDate });
+            }
+
+            saveData();
+            closeCustomerModal();
+        }
+
+        function openPaymentModal(id) {
+            const b = borrowers.find(item => item.id === id);
+            if (!b) return;
+            document.getElementById('pay-cust-id').value = b.id;
+            document.getElementById('pay-cust-name').value = b.name;
+            document.getElementById('pay-amount').value = '';
+            document.getElementById('modal-payment').classList.remove('hidden');
+        }
+
+        function closePaymentModal() {
+            document.getElementById('modal-payment').classList.add('hidden');
+        }
+
+        function savePayment(e) {
+            e.preventDefault();
+            const id = document.getElementById('pay-cust-id').value;
+            const payVal = parseFloat(document.getElementById('pay-amount').value);
+
+            const b = borrowers.find(item => item.id === id);
+            if (b) {
+                b.amountPaid = Math.min(b.amountGiven, b.amountPaid + payVal);
+                saveData();
+            }
+            closePaymentModal();
+        }
+
+        function deleteCustomer(id) {
+            if (confirm("Are you sure you want to delete this customer entry?")) {
+                borrowers = borrowers.filter(b => b.id !== id);
+                saveData();
+            }
+        }
+
+        // WhatsApp Payment Link Generator
+        function sendWhatsAppReminder(id) {
+            const b = borrowers.find(item => item.id === id);
+            if (!b) return;
+
+            const balance = b.amountGiven - b.amountPaid;
+            const payee = encodeURIComponent(settings.payeeName);
+            const upiId = encodeURIComponent(settings.upiId);
+            const upiLink = `upi://pay?pa=${upiId}&pn=${payee}&am=${balance}&cu=INR`;
+
+            const msg = `Hello ${b.name},\n\nThis is a friendly payment reminder from *${settings.payeeName}*.\n\n*Pending Balance:* ₹${balance.toLocaleString('en-IN')}\n*Due Date:* ${b.dueDate}\n\nYou can pay directly via UPI by clicking below:\n${upiLink}\n\nThank you!`;
+
+            const cleanPhone = b.phone.replace(/[^0-9]/g, '');
+            window.open(`https://wa.me/${cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        // Receipt Printable Modal
+        function openReceiptModal(id) {
+            const b = borrowers.find(item => item.id === id);
+            if (!b) return;
+
+            const balance = b.amountGiven - b.amountPaid;
+            document.getElementById('rcpt-date').innerText = `Date: ${new Date().toLocaleDateString('en-IN')}`;
+            document.getElementById('rcpt-cust-name').innerText = b.name;
+            document.getElementById('rcpt-cust-phone').innerText = b.phone;
+            document.getElementById('rcpt-total-loan').innerText = `₹${b.amountGiven.toLocaleString('en-IN')}`;
+            document.getElementById('rcpt-total-repaid').innerText = `₹${b.amountPaid.toLocaleString('en-IN')}`;
+            document.getElementById('rcpt-balance-due').innerText = `₹${balance.toLocaleString('en-IN')}`;
+
+            document.getElementById('modal-receipt').classList.remove('hidden');
+        }
+
+        function closeReceiptModal() {
+            document.getElementById('modal-receipt').classList.add('hidden');
+        }
+
+        // Settings Modal
+        function openSettingsModal() {
+            document.getElementById('set-payee-name').value = settings.payeeName;
+            document.getElementById('set-upi-id').value = settings.upiId;
+            document.getElementById('modal-settings').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('modal-settings').classList.add('hidden');
+        }
+
+        function saveSettings(e) {
+            e.preventDefault();
+            settings.payeeName = document.getElementById('set-payee-name').value.trim();
+            settings.upiId = document.getElementById('set-upi-id').value.trim();
+            localStorage.setItem('receipts_settings', JSON.stringify(settings));
+            closeSettingsModal();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
